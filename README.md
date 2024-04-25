@@ -53,7 +53,7 @@ stackvec = { git = "https://github.com/Lut99/stackvec-rs" }
 You can also commit to a specific tag by supplying it:
 ```toml
 [dependencies]
-stackvec = { git = "https://github.com/Lut99/stackvec-rs", tag = "v0.2.0" }
+stackvec = { git = "https://github.com/Lut99/stackvec-rs", tag = "v0.3.0" }
 ```
 
 
