@@ -4,6 +4,19 @@ This file keeps track of changes to the `stackvec` Rust crate.
 This project uses [semantic versioning](https://semver.org). As such, breaking changes are indicated with **\[breaking\]**.
 
 
+## v0.3.0 (2024-04-25)
+### Added
+- Some unit tests for (future) debugging purposes.
+- Implementations for `PartialEq` for `StackVec` with `[T, LEN2]`, `&'a [T]` and `Vec<T>`.
+
+### Changed
+- `From<[T, LEN]>` is now implemented for `From<T, LEN2>` instead to also allow building it from arrays that don't consume the full capacity.
+    - Note: not a breaking change because this is strictly more powerful than before.
+
+### Fixed
+- A double free error when iterating-by-ownership over a `StackVec` with `Drop`-elements.
+
+
 ## v0.2.0 (2024-04-16)
 ### Added 
 - A `Deref<Target = [u8]>` implementation for the `StackVec`.
