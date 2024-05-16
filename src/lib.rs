@@ -4,7 +4,7 @@
 //  Created:
 //    27 Mar 2024, 10:33:38
 //  Last edited:
-//    25 Apr 2024, 10:37:25
+//    16 May 2024, 15:53:41
 //  Auto updated?
 //    Yes
 //
@@ -65,6 +65,21 @@ pub mod tests {
         let mut vec: StackVec<5, &'static str> = StackVec::from(["Dan", "Amy", "Cho", "Eve", "Bob"]);
         vec.sort();
         assert_eq!(vec, ["Amy", "Bob", "Cho", "Dan", "Eve"]);
+    }
+
+    #[test]
+    fn retain() {
+        let mut vec: StackVec<5, i32> = StackVec::from([1, 2, 3, 4, 5]);
+        vec.retain(|elem| *elem >= 3);
+        assert_eq!(vec, [3, 4, 5]);
+
+        let mut vec: StackVec<5, i32> = StackVec::from([5, 4, 3, 2, 1]);
+        vec.retain(|elem| *elem >= 3);
+        assert_eq!(vec, [5, 4, 3]);
+
+        let mut vec: StackVec<5, i32> = StackVec::from([4, 1, 5, 2, 3]);
+        vec.retain(|elem| *elem >= 3);
+        assert_eq!(vec, [4, 5, 3]);
     }
 }
 
@@ -310,6 +325,38 @@ impl<const LEN: usize, T> StackVec<LEN, T> {
             // Nothing to be done
             None
         }
+    }
+
+    /// Iterates over the elements in the StackVec, and only keeps those matching the predicate.
+    ///
+    /// The elements are moved forward if necessary to produce a coherent vector again.
+    ///
+    /// # Arguments
+    /// - `predicate`: Some boolean predicate over elements to decide what to keep. Specifically, only elements for which this function returns _true_ are kept.
+    #[inline]
+    pub fn retain(&mut self, mut predicate: impl FnMut(&T) -> bool) {
+        // Iterate over the elements
+        let mut write_i: usize = 0;
+        for i in 0..self.len {
+            // Get a reference to the element and see if we should keep it
+            // SAFETY: We use our main assertion that all fields up to `self.len` are initialized. We also know the vector is at least this long.
+            if predicate(unsafe { self.data.get_unchecked(i).assume_init_ref() }) {
+                // First, move this element back to where it should be
+                if write_i < i {
+                    self.data.swap(write_i, i);
+                }
+                #[cfg(debug_assertions)]
+                if write_i > i {
+                    panic!("Somehow, write_i was larger than i ({write_i} > {i})");
+                }
+
+                // Then remember to write to the slot after this.
+                write_i += 1;
+            }
+        }
+
+        // Before returning, don't forget to shrink the list up to the point where we've written to
+        self.len = write_i;
     }
 
     /// Removes the last element from the StackVec.

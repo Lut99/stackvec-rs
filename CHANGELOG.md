@@ -4,6 +4,11 @@ This file keeps track of changes to the `stackvec` Rust crate.
 This project uses [semantic versioning](https://semver.org). As such, breaking changes are indicated with **\[breaking\]**.
 
 
+## v0.4.0 (TODO)
+### Added
+- `StackVec::retain()`
+
+
 ## v0.3.0 (2024-04-25)
 ### Added
 - Some unit tests for (future) debugging purposes.
