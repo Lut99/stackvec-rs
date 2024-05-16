@@ -4,7 +4,7 @@
 //  Created:
 //    27 Mar 2024, 10:33:38
 //  Last edited:
-//    16 May 2024, 15:53:41
+//    16 May 2024, 16:05:36
 //  Auto updated?
 //    Yes
 //
@@ -80,6 +80,29 @@ pub mod tests {
         let mut vec: StackVec<5, i32> = StackVec::from([4, 1, 5, 2, 3]);
         vec.retain(|elem| *elem >= 3);
         assert_eq!(vec, [4, 5, 3]);
+
+        let mut vec: StackVec<5, String> = StackVec::from(["Dan".into(), "Amy".into(), "Cho".into(), "Eve".into(), "Bob".into()]);
+        vec.retain(|elem| !elem.is_empty() && elem.chars().next().unwrap() >= 'C');
+        assert_eq!(vec, ["Dan".into(), "Cho".into(), "Eve".into()]);
+    }
+
+    #[test]
+    fn retain_drain() {
+        let mut vec: StackVec<5, i32> = StackVec::from([1, 2, 3, 4, 5]);
+        vec.retain_drain(|elem| if elem >= 3 { Some(elem) } else { None });
+        assert_eq!(vec, [3, 4, 5]);
+
+        let mut vec: StackVec<5, i32> = StackVec::from([5, 4, 3, 2, 1]);
+        vec.retain_drain(|elem| if elem >= 3 { Some(elem) } else { None });
+        assert_eq!(vec, [5, 4, 3]);
+
+        let mut vec: StackVec<5, i32> = StackVec::from([4, 1, 5, 2, 3]);
+        vec.retain_drain(|elem| if elem >= 3 { Some(elem) } else { None });
+        assert_eq!(vec, [4, 5, 3]);
+
+        let mut vec: StackVec<5, String> = StackVec::from(["Dan".into(), "Amy".into(), "Cho".into(), "Eve".into(), "Bob".into()]);
+        vec.retain_drain(|elem| if !elem.is_empty() && elem.chars().next().unwrap() >= 'C' { Some(elem) } else { None });
+        assert_eq!(vec, ["Dan".into(), "Cho".into(), "Eve".into()]);
     }
 }
 
@@ -331,6 +354,8 @@ impl<const LEN: usize, T> StackVec<LEN, T> {
     ///
     /// The elements are moved forward if necessary to produce a coherent vector again.
     ///
+    /// This is akin to [`StackVec::retain_drain()`], except that elements are visited by reference instead of ownership.
+    ///
     /// # Arguments
     /// - `predicate`: Some boolean predicate over elements to decide what to keep. Specifically, only elements for which this function returns _true_ are kept.
     #[inline]
@@ -351,6 +376,39 @@ impl<const LEN: usize, T> StackVec<LEN, T> {
                 }
 
                 // Then remember to write to the slot after this.
+                write_i += 1;
+            }
+        }
+
+        // Before returning, don't forget to shrink the list up to the point where we've written to
+        self.len = write_i;
+    }
+
+    /// Drains the StackVec, and then only places those back that are returned by a predicate.
+    ///
+    /// This is akin to [`StackVec::retain()`], except that elements are visited by ownership. This is useful when the elements should be moved elsewhere instead of destroyed.
+    ///
+    /// # Arguments
+    /// - `predicate`: Some closure that decides if element needs to be kept. If they do, it should return [`Some`]; if they don't, it should return [`None`].
+    #[inline]
+    pub fn retain_drain(&mut self, mut predicate: impl FnMut(T) -> Option<T>) {
+        // Iterate over the elements
+        let mut write_i: usize = 0;
+        for i in 0..self.len {
+            // Get the element out of the data
+            let mut elem: MaybeUninit<T> = MaybeUninit::uninit();
+            // SAFETY: We use our main assertion that all fields up to `self.len` are initialized to know the vector is at least this long.
+            std::mem::swap(&mut elem, unsafe { self.data.get_unchecked_mut(i) });
+
+            // SAFETY: We use our main assertion that all fields up to `self.len` are initialized, which includes `elem` (see above)
+            if let Some(elem) = predicate(unsafe { elem.assume_init() }) {
+                #[cfg(debug_assertions)]
+                if write_i > i {
+                    panic!("Somehow, write_i was larger than i ({write_i} > {i})");
+                }
+
+                // Store `elem` at the slot, then increment it
+                self.data[write_i] = MaybeUninit::new(elem);
                 write_i += 1;
             }
         }

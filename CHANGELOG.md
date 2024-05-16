@@ -6,7 +6,8 @@ This project uses [semantic versioning](https://semver.org). As such, breaking c
 
 ## v0.4.0 (TODO)
 ### Added
-- `StackVec::retain()`
+- `StackVec::retain()` to efficiently remove elements from a vector based on a condition.
+- `StackVec::retain_drain()` which does the same as `StackVec::retain()`, except by ownership. Useful if the elements need to be moved elsewhere instead of being destroyed.
 
 
 ## v0.3.0 (2024-04-25)
