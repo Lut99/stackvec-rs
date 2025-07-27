@@ -671,50 +671,11 @@ impl<const LEN: usize, T: PartialEq> PartialEq<Vec<T>> for StackVec<LEN, T> {
 }
 impl<const LEN: usize, T: Ord> Ord for StackVec<LEN, T> {
     #[inline]
-    fn cmp(&self, other: &Self) -> Ordering {
-        // SAFETY: We can `unwrap()` here because [`Ord`] requires that `T`'s [`PartialOrd`] implementation always returns [`Some`].
-        self.partial_cmp(other)
-            .expect("Broken promise from 'T'; T implementing 'Ord' requires that its 'PartialOrd' implementation always returns 'Some'")
-    }
+    fn cmp(&self, other: &Self) -> Ordering { self.as_slice().cmp(other.as_slice()) }
 }
 impl<const LEN: usize, T: PartialOrd> PartialOrd for StackVec<LEN, T> {
     #[inline]
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        for i in 0.. {
-            // See if we're still into range
-            if i >= self.len && i >= other.len {
-                // They really are the same; stop here
-                break;
-            } else if i < self.len {
-                // `self` is shorter than `other`, which tells us to consider `self` the lesser
-                // See 'https://doc.rust-lang.org/std/cmp/trait.Ord.html#lexicographical-comparison'
-                return Some(Ordering::Less);
-            } else if i < other.len {
-                // `self` is longer than `other`, which tells us to consider `self` the greater
-                // See 'https://doc.rust-lang.org/std/cmp/trait.Ord.html#lexicographical-comparison'
-                return Some(Ordering::Greater);
-            }
-
-            // Otherwise, the ordering depends on the elements
-            // SAFETY: We use our assertion for `self.len` that the first `self.len` elements are always initialized, and the fact that we asserted that `i` is shorted than `self.len`.
-            let lhs: &T = unsafe { self.data[i].assume_init_ref() };
-            // SAFETY: We use our assertion for `self.len` that the first `self.len` elements are always initialized, and the fact that we asserted that `i` is shorted than `other.len`.
-            let rhs: &T = unsafe { other.data[i].assume_init_ref() };
-
-            // Compare them
-            match lhs.partial_cmp(rhs) {
-                Some(Ordering::Greater) => return Some(Ordering::Greater),
-                Some(Ordering::Less) => return Some(Ordering::Less),
-                None => return None,
-
-                // Only if they are explicitly equal, we continue
-                Some(Ordering::Equal) => continue,
-            }
-        }
-
-        // If we got here, all elements & length are equal
-        Some(Ordering::Equal)
-    }
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> { self.as_slice().partial_cmp(other.as_slice()) }
 }
 
 // Deref
@@ -728,6 +689,14 @@ impl<const LEN: usize, T> DerefMut for StackVec<LEN, T> {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target { self.as_slice_mut() }
 }
+impl<const LEN: usize, T> AsRef<[T]> for StackVec<LEN, T> {
+    #[inline]
+    fn as_ref(&self) -> &[T] { self.as_slice() }
+}
+impl<const LEN: usize, T> AsMut<[T]> for StackVec<LEN, T> {
+    #[inline]
+    fn as_mut(&mut self) -> &mut [T] { self.as_slice_mut() }
+}
 
 // Indexing
 impl<const LEN: usize, T> Index<usize> for StackVec<LEN, T> {
@@ -736,24 +705,16 @@ impl<const LEN: usize, T> Index<usize> for StackVec<LEN, T> {
     #[inline]
     #[track_caller]
     fn index(&self, index: usize) -> &Self::Output {
-        if index < self.len {
-            // SAFETY: We use our assertion for `self.len` that the first `self.len` elements are always initialized, and that `idx` is surely within range of `self.len`.
-            unsafe { self.data[index].assume_init_ref() }
-        } else {
-            panic!("Index {} is out-of-bounds for a StackVec of length {}", index, self.len);
-        }
+        let self_len: usize = self.len();
+        self.as_slice().get(index).unwrap_or_else(|| panic!("Index {index} is out-of-bounds for a StackVec of length {self_len}"))
     }
 }
 impl<const LEN: usize, T> IndexMut<usize> for StackVec<LEN, T> {
     #[inline]
     #[track_caller]
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-        if index < self.len {
-            // SAFETY: We use our assertion for `self.len` that the first `self.len` elements are always initialized, and that `idx` is surely within range of `self.len`.
-            unsafe { self.data[index].assume_init_mut() }
-        } else {
-            panic!("Index {} is out-of-bounds for a StackVec of length {}", index, self.len);
-        }
+        let self_len: usize = self.len;
+        self.as_slice_mut().get_mut(index).unwrap_or_else(|| panic!("Index {index} is out-of-bounds for a StackVec of length {self_len}"))
     }
 }
 index_range_impl!(Range<usize>, |len: usize, index: Range<usize>| {
